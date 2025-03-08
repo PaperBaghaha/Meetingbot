@@ -8,6 +8,7 @@ from datetime import datetime
 from transformers import pipeline
 import dateparser
 
+# Initialize Firebase Admin
 cred = credentials.Certificate("serviceAccountKey.json")
 firebase_admin.initialize_app(cred)
 db = firestore.client()
@@ -19,6 +20,7 @@ os.makedirs(PROCESSED_FOLDER, exist_ok=True)
 
 app = Flask(__name__)
 
+# Initialize summarizer from your friend's code
 summarizer = pipeline("summarization", model="t5-small")
 
 def summarize_text(text):
@@ -70,31 +72,39 @@ def upload_file():
         filepath = os.path.join(UPLOAD_FOLDER, file.filename)
         file.save(filepath)
 
+        # Convert to MP3 using ffmpeg
         mp3_filename = os.path.splitext(file.filename)[0] + '.mp3'
         mp3_filepath = os.path.join(PROCESSED_FOLDER, mp3_filename)
 
         subprocess.run(['ffmpeg', '-i', filepath, mp3_filepath])
 
+        # Transcribe using Whisper
         model = whisper.load_model("base")
         result = model.transcribe(mp3_filepath)
         transcription_text = result['text']
 
+        # Summarize transcription
         summary = summarize_text(transcription_text)
 
+        # Extract important dates from summary
         important_dates = extract_dates(summary)
 
+        # Dummy extracted details (you can replace with your proper event extraction later)
         extracted_details = {
             "plans_for_week": ["Review project plan", "Prepare for client presentation"],
-            "deadline_date": "2025-03-15",
+            "deadline_date": "2025-03-15",  # This is just a placeholder
         }
         cleaned_details = clean_extracted_details(extracted_details)
 
+        # Save to Firestore
         save_to_firestore(transcription_text, summary, file.filename, cleaned_details, important_dates)
 
+        # Save transcription to text file (optional)
         txt_filepath = os.path.join(PROCESSED_FOLDER, mp3_filename + '.txt')
         with open(txt_filepath, 'w', encoding='utf-8') as f:
             f.write(transcription_text)
 
+        # Return confirmation to user
     return f"""
     <!DOCTYPE html>
     <html lang="en">
